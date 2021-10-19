@@ -6,9 +6,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.amatos.restcountries.domain.ICountryRestSymbols;
 import dev.amatos.restcountries.domain.ResponseEntity;
-import dev.amatos.restcountries.domain.v3.Country;
-import dev.amatos.restcountries.service.v3.CountryServiceV3;
-import io.micronaut.http.HttpResponse;
+import dev.amatos.restcountries.service.v2.CountryServiceV2;
+import dev.amatos.restcountries.domain.v2.Country;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -18,21 +17,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
-@Controller("v3/")
-public class CountryControllerV3 extends ControllerHelper {
+@Controller("v2/")
+public class CountryControllerV2 {
 
   @Get(uri = "all", produces = MediaType.APPLICATION_JSON)
   public Object getAllCountries(@QueryValue("fields") Optional<String> fields) {
-    var countries = CountryServiceV3.getInstance().getAll();
+    List<Country> countries = CountryServiceV2.getInstance().getAll();
     return checkFieldsAndParseCountries(fields, countries);
   }
 
-  private Object checkFieldsAndParseCountries(Optional<String> fields,
-      Set<Country> countries) {
+  private Object checkFieldsAndParseCountries(Optional<String> fields, List<Country> countries) {
     if (fields.isPresent()) {
       return parsedCountries(countries, fields.get());
     } else {
@@ -47,20 +44,20 @@ public class CountryControllerV3 extends ControllerHelper {
       alpha = alpha.replace("codes=", "");
     }
     if (isEmpty(alpha) || alpha.length() < 2 || alpha.length() > 3) {
-      return HttpResponse.badRequest(getResponse(Response.Status.BAD_REQUEST));
+      return getResponse(Response.Status.BAD_REQUEST);
     }
-    var country = CountryServiceV3.getInstance().getByAlpha(alpha);
+    Country country = CountryServiceV2.getInstance().getByAlpha(alpha);
     if (country != null) {
       return checkFieldsAndParseCountry(country, fields);
     }
-    return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+    return getResponse(Response.Status.NOT_FOUND);
   }
 
-  private Object checkFieldsAndParseCountry(Set<Country> countries, Optional<String> fields) {
+  private Object checkFieldsAndParseCountry(Country country, Optional<String> fields) {
     if (fields.isPresent()) {
-      return parsedCountry(countries, fields.get());
+      return parsedCountry(country, fields.get());
     } else {
-      return parsedCountry(countries, null);
+      return parsedCountry(country, null);
     }
   }
 
@@ -68,16 +65,16 @@ public class CountryControllerV3 extends ControllerHelper {
   public Object getByAlphaList(@QueryParam("codes") String codes,
       @QueryParam("fields") Optional<String> fields) {
     if (isEmpty(codes) || codes.length() < 2 || (codes.length() > 3 && !codes.contains(","))) {
-      return HttpResponse.badRequest(getResponse(Response.Status.BAD_REQUEST));
+      return getResponse(Response.Status.BAD_REQUEST);
     }
     try {
-      var countries = CountryServiceV3.getInstance().getByCodeList(codes);
+      List<Country> countries = CountryServiceV2.getInstance().getByCodeList(codes);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(getResponse(Response.Status.INTERNAL_SERVER_ERROR));
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
 
   }
@@ -85,17 +82,17 @@ public class CountryControllerV3 extends ControllerHelper {
   @Get("currency/{currency}")
   public Object getByCurrency(@PathVariable("currency") String currency,
       @QueryParam("fields") Optional<String> fields) {
-    if (isEmpty(currency)) {
+    if (isEmpty(currency) || currency.length() != 3) {
       return getResponse(Response.Status.BAD_REQUEST);
     }
     try {
-      var countries = CountryServiceV3.getInstance().getByCurrency(currency);
+      List<Country> countries = CountryServiceV2.getInstance().getByCurrency(currency);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(getResponse(Response.Status.INTERNAL_SERVER_ERROR));
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -104,14 +101,29 @@ public class CountryControllerV3 extends ControllerHelper {
       @QueryParam("fullText") Optional<Boolean> fullText,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance()
+      List<Country> countries = CountryServiceV2.getInstance()
           .getByName(name, fullText.orElse(false));
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get("callingcode/{callingCode}")
+  public Object getByCallingCode(@PathVariable("callingCode") String callingCode,
+      @QueryParam("fields") Optional<String> fields) {
+
+    try {
+      List<Country> countries = CountryServiceV2.getInstance().getByCallingCode(callingCode);
+      if (!countries.isEmpty()) {
+        return checkFieldsAndParseCountries(fields, countries);
+      }
+      return getResponse(Response.Status.NOT_FOUND);
+    } catch (Exception e) {
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -119,28 +131,27 @@ public class CountryControllerV3 extends ControllerHelper {
   public Object getByCapital(@PathVariable("capital") String capital,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getByCapital(capital);
+      List<Country> countries = CountryServiceV2.getInstance().getByCapital(capital);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
-
 
   @Get("region/{region}")
   public Object getByContinent(@PathVariable("region") String region,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getByRegion(region);
+      List<Country> countries = CountryServiceV2.getInstance().getByRegion(region);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -148,13 +159,13 @@ public class CountryControllerV3 extends ControllerHelper {
   public Object getBySubRegion(@PathVariable("subregion") String subregion,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getBySubregion(subregion);
+      List<Country> countries = CountryServiceV2.getInstance().getBySubregion(subregion);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -162,13 +173,13 @@ public class CountryControllerV3 extends ControllerHelper {
   public Object getByLanguage(@PathVariable("lang") String language,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getByLanguage(language);
+      List<Country> countries = CountryServiceV2.getInstance().getByLanguage(language);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
 
   }
@@ -177,31 +188,31 @@ public class CountryControllerV3 extends ControllerHelper {
   public Object getByDemonym(@PathVariable("demonym") String demonym,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getByDemonym(demonym);
+      List<Country> countries = CountryServiceV2.getInstance().getByDemonym(demonym);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
-  @Get("translation/{translation}")
-  public Object getByTranslation(@PathVariable("translation") String translation,
+  @Get("regionalbloc/{regionalBlock}")
+  public Object getByRegionalBloc(@PathVariable("regionalBlock") String regionalBlock,
       @QueryParam("fields") Optional<String> fields) {
     try {
-      var countries = CountryServiceV3.getInstance().getByTranslation(translation);
+      List<Country> countries = CountryServiceV2.getInstance().getByRegionalBloc(regionalBlock);
       if (!countries.isEmpty()) {
         return checkFieldsAndParseCountries(fields, countries);
       }
-      return HttpResponse.notFound(getResponse(Response.Status.NOT_FOUND));
+      return getResponse(Response.Status.NOT_FOUND);
     } catch (Exception e) {
-      return HttpResponse.serverError(Response.Status.INTERNAL_SERVER_ERROR);
+      return getResponse(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
-  private Object parsedCountries(Set<Country> countries, String excludedFields) {
+  private Object parsedCountries(List<Country> countries, String excludedFields) {
     if (excludedFields == null || excludedFields.isEmpty()) {
       return countries;
     } else {
@@ -210,22 +221,25 @@ public class CountryControllerV3 extends ControllerHelper {
     }
   }
 
-  private String getCountriesJson(Set<Country> countries, List<String> fields) {
+  private String getCountriesJson(List<Country> countries, List<String> fields) {
     var gson = new Gson();
     var parser = new JsonParser();
-    var jsonArray = parser.parse(gson.toJson(countries)).getAsJsonArray();
+    JsonArray jsonArray = parser.parse(gson.toJson(countries)).getAsJsonArray();
     var resultArray = new JsonArray();
-    jsonArray.forEach(element -> {
-      var jsonObject = (JsonObject) element;
-      var excludedFields = getExcludedFields(fields);
-      excludedFields.forEach(jsonObject::remove);
+    for (var i = 0; i < jsonArray.size(); i++) {
+      var jsonObject = (JsonObject) jsonArray.get(i);
+
+      List<String> excludedFields = getExcludedFields(fields);
+      for (String excludedField : excludedFields) {
+        jsonObject.remove(excludedField);
+      }
       resultArray.add(jsonObject);
-    });
+    }
     return resultArray.toString();
   }
 
   private List<String> getExcludedFields(List<String> fields) {
-    List<String> excludedFields = new ArrayList<>(Arrays.asList(V3_COUNTRY_FIELDS));
+    List<String> excludedFields = new ArrayList<>(Arrays.asList(COUNTRY_FIELDS));
     excludedFields.removeAll(fields);
     return excludedFields;
   }
@@ -235,31 +249,60 @@ public class CountryControllerV3 extends ControllerHelper {
     return Response
         .status(status)
         .entity(gson.toJson(new ResponseEntity(status.getStatusCode(),
-            status.getReasonPhrase())))
-        .build()
-        .getEntity();
+            status.getReasonPhrase()))).build().getEntity();
   }
 
-  private Object parsedCountry(Set<Country> countries, String fields) {
+  private Object parsedCountry(Country country, String fields) {
     if (fields == null || fields.isEmpty()) {
-      return countries;
+      return country;
     } else {
-      StringBuilder result = new StringBuilder();
-      countries.forEach(country -> result.append(
-          getCountryJson(country, Arrays.asList(fields.split(ICountryRestSymbols.COLON)))));
-      return result;
+      return getCountryJson(country, Arrays.asList(fields.split(ICountryRestSymbols.COLON)));
     }
   }
 
   private String getCountryJson(Country country, List<String> fields) {
     var gson = new Gson();
     var parser = new JsonParser();
-    var jsonObject = parser.parse(gson.toJson(country)).getAsJsonObject();
+    JsonObject jsonObject = parser.parse(gson.toJson(country)).getAsJsonObject();
 
     List<String> excludedFields = getExcludedFields(fields);
-    excludedFields.forEach(jsonObject::remove);
+    for (String field : excludedFields) {
+      jsonObject.remove(field);
+    }
     return jsonObject.toString();
   }
+
+  private static final String[] COUNTRY_FIELDS = new String[]{
+      "name",
+      "topLevelDomain",
+      "alpha2Code",
+      "alpha3Code",
+      "callingCodes",
+      "capital",
+      "altSpellings",
+      "region",
+      "subregion",
+      "translations",
+      "population",
+      "latlng",
+      "demonym",
+      "area",
+      "gini",
+      "timezones",
+      "borders",
+      "nativeName",
+      "numericCode",
+      "currencies",
+      "languages",
+      "flags",
+      "regionalBlocs",
+      "cioc",
+      "independent",
+      "continent",
+      "borders",
+      "flag",
+      "flags"
+  };
 
   private boolean isEmpty(String value) {
     return value == null || value.isEmpty();
